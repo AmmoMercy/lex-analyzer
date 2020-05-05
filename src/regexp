@@ -1,0 +1,6 @@
+Reserved word
+void|int|float|if|else
+id
+[a-z | A-Z]( [a-z | A-Z]|[0-9])*
+relation
++|-|\*|/|
