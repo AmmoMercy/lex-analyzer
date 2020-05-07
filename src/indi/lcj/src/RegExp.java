@@ -1,3 +1,5 @@
+package indi.lcj.src;
+
 public class RegExp {
     private String name;
     private String content;
