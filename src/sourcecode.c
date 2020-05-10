@@ -1,5 +1,5 @@
 void test(int a, int b, float c, float d)
-{    int x;
+{     int x;
       float y;
       x = a + b;
       y = c / d;

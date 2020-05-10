@@ -31,6 +31,15 @@ public abstract class FA {
         return set;
     }
 
+    public void calculateStates(){
+        states.clear();
+        for(Trans tran:transitions){
+            if(!states.contains(tran.state_from))states.add(tran.state_from);
+            if(!states.contains(tran.state_to))states.add(tran.state_to);
+        }
+    }
+
+
     static class Trans {
         public int state_from, state_to;
         public char trans_symbol;
@@ -41,6 +50,7 @@ public abstract class FA {
             this.trans_symbol = sym;
         }
     }
+
 
 
 }

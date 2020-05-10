@@ -2,6 +2,9 @@ package indi.lcj.src;
 
 
 import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
 
 public class Lex {
@@ -11,8 +14,8 @@ public class Lex {
     private final static Character EPSILON = 'ε';
 
     public static void main(String[] args) throws Exception {
-        String path = DIR + "regexp";
-        InputStreamReader reader = new InputStreamReader(new FileInputStream(path));
+        String regpath = DIR + "regexp";
+        InputStreamReader reader = new InputStreamReader(new FileInputStream(regpath));
         BufferedReader bufferedReader = new BufferedReader(reader);
         List<RegExp> list = new LinkedList<RegExp>();
         String str = bufferedReader.readLine();
@@ -25,11 +28,50 @@ public class Lex {
         for (RegExp regExp : list) {
             pretreatReg(regExp);
         }
-        System.out.println();
+        HashMap<String, DFA> dfaHashMap = new HashMap<>();
+        LinkedList<String> keys = new LinkedList<>();
+        for (RegExp exp : list) {
+            NFA nfa = thompson(exp.getContent());
+            System.out.println("\n"+exp.getName()+" NFA");
+            nfa.display();
+            DFA dfa = determine(nfa);
+            System.out.println("\n"+exp.getName()+" DFA");
+            dfa.display();
+            minimize(dfa);
+            System.out.println("\n"+exp.getName()+" minimized DFA");
+            dfa.display();
+            dfaHashMap.put(exp.getName(), dfa);
+            keys.add(exp.getName());
+
+        }
+        Path SourcePath = Paths.get(DIR + "sourcecode.c");
+        byte[] data = Files.readAllBytes(SourcePath);
+        String sourcecode = new String(data, "utf-8");
+        sourcecode = sourcecode.replace("\n", "");
+        sourcecode = sourcecode.replace(" ", "");
+        sourcecode = sourcecode.replace("\r", "");
+        int left = 0;
+        while (left < sourcecode.length()) {
+            boolean flag = false;
+            for (String reg : keys) {
+                int res = dfaHashMap.get(reg).read(left, sourcecode);
+                if (res != left) {
+                    System.out.println(sourcecode.substring(left, res) + " " + reg);
+                    left = res;
+                    flag = true;
+                    break;
+                }
+            }
+            if (!flag) {
+                System.out.println(sourcecode.charAt(left) + " wrong input");
+                break;
+            }
+        }
+
     }
 
     public static boolean alphabet(char c) {
-        return c >= 'a' && c <= 'z' || c == EPSILON;
+        return c != '(' && c != ')' && c != '*' && c != '|';
     }
 
 
@@ -45,7 +87,9 @@ public class Lex {
 
         for (int i = 0; i < regex.length(); i++) {
             c = regex.charAt(i);
+
             if (alphabet(c)) {
+                if (c == '\\') c = regex.charAt(++i);
                 operands.push(new NFA(c));
                 if (ccflag) { // concat this w/ previous
                     operators.push('.'); // '.' used to represent concat.
@@ -90,12 +134,17 @@ public class Lex {
                                 nfa1 = operands.pop();
                             }
                             operands.push(NFA.union(nfa1, nfa2));
+                            ccflag=true;
                         }
                     }
                 } else if (c == '*') {
                     operands.push(NFA.kleene(operands.pop()));
                     ccflag = true;
                 } else if (c == '(') { // if any other operator: push
+                    if (ccflag) {
+                        operators.push('.');
+                        ccflag = false;
+                    }
                     operators.push(c);
                     para_count++;
                 } else if (c == '|') {
@@ -160,6 +209,8 @@ public class Lex {
             res.states.add(i);
             for (char c : characters) {
                 HashSet<Integer> cur = epsilonClosure(nfa, smove(nfa, charSetMap.get(i), c));
+                //空闭包是空集 跳过
+                if (cur.size() == 0) continue;
                 boolean flag = false;
                 int j = 0;
                 for (; j < charSetMap.size(); j++) {
@@ -168,26 +219,17 @@ public class Lex {
                         break;
                     }
                 }
+                //没有包含该闭包
                 if (flag == false) {
                     charSetMap.add(cur);
                 }
-                if (cur.contains(nfa.final_state)) res.final_state = charSetMap.indexOf(cur);
+                //是终态
+                if (cur.contains(nfa.final_state) && !res.finalStates.contains(charSetMap.indexOf(cur)))
+                    res.finalStates.add(charSetMap.indexOf(cur));
                 res.transitions.add(new FA.Trans(i, j, c));
             }
         }
-        return res;
-    }
-
-    static HashSet<Integer> smove(NFA nfa, HashSet<Integer> set, char c) {
-        ArrayList<FA.Trans> trans = nfa.transitions;
-        HashSet<Integer> res = new HashSet<>();
-        for (int i : set) {
-            for (FA.Trans tran : trans) {
-                if (tran.state_from == i && tran.trans_symbol == c) {
-                    res.add(tran.state_to);
-                }
-            }
-        }
+        res.calculateStates();
         return res;
     }
 
@@ -206,6 +248,108 @@ public class Lex {
         }
 
         return res;
+    }
+
+    static HashSet<Integer> smove(NFA nfa, HashSet<Integer> set, char c) {
+        ArrayList<FA.Trans> trans = nfa.transitions;
+        HashSet<Integer> res = new HashSet<>();
+        for (int i : set) {
+            for (FA.Trans tran : trans) {
+                if (tran.state_from == i && tran.trans_symbol == c) {
+                    res.add(tran.state_to);
+                }
+            }
+        }
+        return res;
+    }
+
+    public static DFA minimize(DFA dfa) {
+        DFA res = new DFA();
+        LinkedList<Integer> states = new LinkedList<>((ArrayList<Integer>) dfa.states.clone());
+        LinkedList<LinkedList<Integer>> piNew = new LinkedList<>();
+        for (int i : dfa.finalStates) {
+//            LinkedList<Integer> temp = new LinkedList<>();
+//            temp.add(i);
+//            piNew.add(temp);
+            states.remove(states.indexOf(i));
+        }
+        piNew.addFirst(states);
+        final LinkedList<Character> chars = new LinkedList<>(dfa.getChars());
+        while (true) {
+            LinkedList<LinkedList<Integer>> piOld = (LinkedList<LinkedList<Integer>>) piNew.clone();
+            for (int i = 0; i < piNew.size(); i++) {
+                LinkedList<Integer> G = piNew.get(i);
+                if (G.size() == 1) continue;
+                LinkedList<LinkedList<Integer>> dividision = divide(dfa, G, chars, piOld);
+                piOld.remove(G);
+                piOld.addAll(dividision);
+            }
+            if (piNew.equals(piOld)) {
+                break;
+            } else {
+                piNew = piOld;
+            }
+        }
+        piNew.add(new LinkedList<>(dfa.finalStates));
+
+        List<FA.Trans> trans = dfa.transitions;
+        for (FA.Trans tran : trans) {
+            for (int i = 0; i < piNew.size(); i++) {
+                LinkedList<Integer> list = piNew.get(i);
+                if (list.contains(tran.state_from)) {
+                    tran.state_from = list.get(0);
+                }
+                if (list.contains(tran.state_to)) {
+                    tran.state_to = list.get(0);
+                }
+            }
+        }
+        dfa.calculateStates();
+        return dfa;
+
+
+    }
+
+    static LinkedList<LinkedList<Integer>> divide(DFA dfa, LinkedList<Integer> G, LinkedList<Character> chars, LinkedList<LinkedList<Integer>> pi) {
+        LinkedList<LinkedList<Integer>> res = new LinkedList<>();
+        HashMap<Integer, LinkedList<Integer>> container = new HashMap<>();
+        for (int state : G) {
+            LinkedList<Integer> list = new LinkedList<>();
+            for (char c : chars) {
+                list.add(move(dfa, state, c, pi));
+            }
+            container.put(state, list);
+        }
+        LinkedList<Integer> keys = new LinkedList<>(container.keySet());
+        boolean[] visited = new boolean[keys.size()];
+        for (int i = 0; i < keys.size(); i++) {
+            if (visited[i]) continue;
+            LinkedList<Integer> temp = new LinkedList<>();
+            temp.add(keys.get(i));
+            for (int j = i + 1; j < keys.size(); j++) {
+                if (!visited[j] && container.get(keys.get(j)).equals(container.get(keys.get(i)))) {
+
+                    temp.add(keys.get(j));
+                    visited[j] = true;
+                }
+            }
+            res.add(temp);
+        }
+        return res;
+    }
+
+    static int move(DFA dfa, int s, char symbol, LinkedList<LinkedList<Integer>> pi) {
+        int toState = 0;
+        for (FA.Trans tran : dfa.transitions) {
+            if (tran.state_from == s && tran.trans_symbol == symbol) {
+                toState = tran.state_to;
+                break;
+            }
+        }
+        for (int i = 0; i < pi.size(); i++) {
+            if (pi.get(i).contains(toState)) return i;
+        }
+        return -1;
     }
 
 
