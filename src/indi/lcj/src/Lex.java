@@ -7,13 +7,26 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 
+/**
+ *
+ */
 public class Lex {
     private final static String DIR = "D:\\Doc\\java\\lex\\src\\";
     private final static String NUM = "0|1|2|3|4|5|6|7|8|9";
     private final static String UPPER_CHARS = "A|B|C|D|E|F|G|H|I|J|K|L|M|N|O|P|Q|R|S|T|U|V|W|X|Y|Z";
     private final static Character EPSILON = 'ε';
 
+
+    /**
+     * @param args
+     * @throws Exception
+     */
     public static void main(String[] args) throws Exception {
+        //将打印方式设为输出到文件
+        PrintStream out = new PrintStream(DIR + "out");
+        System.setOut(out);
+
+        //读取正则
         String regpath = DIR + "regexp";
         InputStreamReader reader = new InputStreamReader(new FileInputStream(regpath));
         BufferedReader bufferedReader = new BufferedReader(reader);
@@ -25,52 +38,54 @@ public class Lex {
             list.add(new RegExp(pattern, reg));
             str = bufferedReader.readLine();
         }
+        //对正则进行预处理
         for (RegExp regExp : list) {
             pretreatReg(regExp);
         }
+        //存放DFA的map
         HashMap<String, DFA> dfaHashMap = new HashMap<>();
         LinkedList<String> keys = new LinkedList<>();
         for (RegExp exp : list) {
             NFA nfa = thompson(exp.getContent());
-            System.out.println("\n"+exp.getName()+" NFA");
+            System.out.println("\n" + exp.getName() + " NFA");
             nfa.display();
             DFA dfa = determine(nfa);
-            System.out.println("\n"+exp.getName()+" DFA");
+            System.out.println("\n" + exp.getName() + " DFA");
             dfa.display();
             minimize(dfa);
-            System.out.println("\n"+exp.getName()+" minimized DFA");
+            System.out.println("\n" + exp.getName() + " minimized DFA");
             dfa.display();
             dfaHashMap.put(exp.getName(), dfa);
             keys.add(exp.getName());
-
         }
+        //读取源程序
         Path SourcePath = Paths.get(DIR + "sourcecode.c");
         byte[] data = Files.readAllBytes(SourcePath);
         String sourcecode = new String(data, "utf-8");
+        //去除多余字符
         sourcecode = sourcecode.replace("\n", "");
         sourcecode = sourcecode.replace(" ", "");
         sourcecode = sourcecode.replace("\r", "");
         int left = 0;
         while (left < sourcecode.length()) {
             boolean flag = false;
-            for (String reg : keys) {
-                int res = dfaHashMap.get(reg).read(left, sourcecode);
+            for (String key : keys) {
+                int res = dfaHashMap.get(key).read(left, sourcecode);
                 if (res != left) {
-                    System.out.println(sourcecode.substring(left, res) + " " + reg);
+                    System.out.println(sourcecode.substring(left, res) + " " + key);
                     left = res;
                     flag = true;
                     break;
                 }
             }
             if (!flag) {
-                System.out.println(sourcecode.charAt(left) + " wrong input");
+                System.out.println(sourcecode.charAt(left) + " error!");
                 break;
             }
         }
-
     }
 
-    public static boolean alphabet(char c) {
+    static boolean alphabet(char c) {
         return c != '(' && c != ')' && c != '*' && c != '|';
     }
 
@@ -98,14 +113,8 @@ public class Lex {
             } else {
                 if (c == ')') {
                     ccflag = false;
-                    if (para_count == 0) {
-                        System.out.println("Error: More end paranthesis " +
-                                "than beginning paranthesis");
-                        System.exit(1);
-                    } else {
-                        para_count--;
-                    }
-                    // process stuff on stack till '('
+
+                    // 构造NFA直到遇到 '('
                     while (!operators.empty() && operators.peek() != '(') {
                         op = operators.pop();
                         if (op == '.') {
@@ -134,7 +143,7 @@ public class Lex {
                                 nfa1 = operands.pop();
                             }
                             operands.push(NFA.union(nfa1, nfa2));
-                            ccflag=true;
+                            ccflag = true;
                         }
                     }
                 } else if (c == '*') {
@@ -274,6 +283,7 @@ public class Lex {
             states.remove(states.indexOf(i));
         }
         piNew.addFirst(states);
+        piNew.add(new LinkedList<>(dfa.finalStates));
         final LinkedList<Character> chars = new LinkedList<>(dfa.getChars());
         while (true) {
             LinkedList<LinkedList<Integer>> piOld = (LinkedList<LinkedList<Integer>>) piNew.clone();
@@ -290,7 +300,6 @@ public class Lex {
                 piNew = piOld;
             }
         }
-        piNew.add(new LinkedList<>(dfa.finalStates));
 
         List<FA.Trans> trans = dfa.transitions;
         for (FA.Trans tran : trans) {
@@ -305,6 +314,7 @@ public class Lex {
             }
         }
         dfa.calculateStates();
+        dfa.clear();
         return dfa;
 
 
@@ -320,6 +330,7 @@ public class Lex {
             }
             container.put(state, list);
         }
+
         LinkedList<Integer> keys = new LinkedList<>(container.keySet());
         boolean[] visited = new boolean[keys.size()];
         for (int i = 0; i < keys.size(); i++) {
@@ -339,13 +350,14 @@ public class Lex {
     }
 
     static int move(DFA dfa, int s, char symbol, LinkedList<LinkedList<Integer>> pi) {
-        int toState = 0;
+        int toState = -1;
         for (FA.Trans tran : dfa.transitions) {
             if (tran.state_from == s && tran.trans_symbol == symbol) {
                 toState = tran.state_to;
                 break;
             }
         }
+        if (toState == -1) return -1;
         for (int i = 0; i < pi.size(); i++) {
             if (pi.get(i).contains(toState)) return i;
         }

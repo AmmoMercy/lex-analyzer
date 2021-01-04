@@ -34,28 +34,21 @@ public class NFATest {
 
     @Test
     public void determine() {
-        NFA nfa = Lex.thompson("void");
-        nfa.display();
+        NFA nfa = Lex.thompson("(a|b)*abb");
         DFA dfa = Lex.determine(nfa);
-        System.out.println(nfa.final_state);
         dfa.display();
         System.out.println(dfa.finalStates);
     }
 
     @Test
     public void minimize() {
-        NFA nfa = Lex.thompson("(A|B)(A|B|1)*");
+        NFA nfa = Lex.thompson("(a|b)*abb*");
         nfa.display();
         DFA dfa = Lex.determine(nfa);
         System.out.println("\ndfa ");
-
         dfa.display();
-
-
         System.out.println(dfa.finalStates);
-
         dfa = Lex.minimize(dfa);
-
         System.out.println("\ndfa mimi");
         dfa.display();
         System.out.println(dfa.finalStates);
@@ -63,13 +56,25 @@ public class NFATest {
 
     @Test
     public void read() {
-        NFA nfa = Lex.thompson("(A|B)(A|B|1)*");
+        NFA nfa = Lex.thompson("0*(.|ε)00*");
+        nfa.display();
+        DFA dfa = Lex.determine(nfa);
+        System.out.println(nfa.final_state);
+        Lex.minimize(dfa);
+        dfa.display();
+        System.out.println(dfa.finalStates);
+
+        System.out.println(dfa.read(0, "0.0"));
+    }
+
+    @Test
+    public void readAgain() {
+        NFA nfa = Lex.thompson("{|}|\\(|\\)|,|;");
         nfa.display();
         DFA dfa = Lex.determine(nfa);
         System.out.println(nfa.final_state);
         dfa.display();
         System.out.println(dfa.finalStates);
-        System.out.println(dfa.read(0, "1A"));
+        System.out.println(dfa.read(0, "("));
     }
-
 }

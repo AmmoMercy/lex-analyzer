@@ -1,9 +1,6 @@
 package indi.lcj.src;
 
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
 
 public class DFA extends FA {
     public ArrayList<Integer> finalStates;
@@ -11,17 +8,20 @@ public class DFA extends FA {
     public int read(int left, String s) {
         int state = 0;
         int right = left;
+        int res = right;
+        if (finalStates.contains(state)) res = right;
         for (; right < s.length(); right++) {
-            if (finalStates.contains(state) && !finalStates.contains(move(state, s.charAt(right)))) return right;
             state = move(state, s.charAt(right));
             if (state == -1) {
-                return left;
+                break;
             }
+            if (finalStates.contains(state)) res = right+1;
+
         }
-        return right;
+        return res;
     }
 
-    int move(int state, char c) {
+    private int move(int state, char c) {
         for (Trans tran : transitions) {
             if (state == tran.state_from && c == tran.trans_symbol) {
                 return tran.state_to;
@@ -30,9 +30,25 @@ public class DFA extends FA {
         return -1;
     }
 
+
     public DFA() {
         super();
         finalStates = new ArrayList<>();
+    }
+
+    public void clear() {
+        ArrayList<Trans> newTrans = new ArrayList<>();
+        for (Trans tran : transitions) {
+            boolean flag = false;
+            for (Trans newTran : newTrans) {
+                if (tran.equals(newTran)) {
+                    flag = true;
+                    break;
+                }
+            }
+            if (!flag) newTrans.add(tran);
+        }
+        this.transitions = newTrans;
     }
 
 //    public void display() {

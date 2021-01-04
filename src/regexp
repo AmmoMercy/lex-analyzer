@@ -3,7 +3,7 @@ void|int|float|if|else
 id
 ([a-z|A-Z])([a-z|A-Z]|[0-9])*
 num
-([0-9])*.*([0-9])*
+([0-9])*(.|ε)([0-9])([0-9])*
 operator
 +|-|\*|/|>|=
 delimiter

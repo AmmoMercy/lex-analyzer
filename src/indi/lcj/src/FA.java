@@ -31,11 +31,11 @@ public abstract class FA {
         return set;
     }
 
-    public void calculateStates(){
+    public void calculateStates() {
         states.clear();
-        for(Trans tran:transitions){
-            if(!states.contains(tran.state_from))states.add(tran.state_from);
-            if(!states.contains(tran.state_to))states.add(tran.state_to);
+        for (Trans tran : transitions) {
+            if (!states.contains(tran.state_from)) states.add(tran.state_from);
+            if (!states.contains(tran.state_to)) states.add(tran.state_to);
         }
     }
 
@@ -49,8 +49,11 @@ public abstract class FA {
             this.state_to = v2;
             this.trans_symbol = sym;
         }
-    }
 
+        public boolean equals(Trans a) {
+            return a.trans_symbol == this.trans_symbol && a.state_to == this.state_to && a.state_from == this.state_from;
+        }
+    }
 
 
 }

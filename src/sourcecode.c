@@ -6,5 +6,6 @@ void test(int a, int b, float c, float d)
       if(x>y)
            x = 10;
       else
-           y = 12.5;
+
+ 撒地方         y = 12.5;
 }
